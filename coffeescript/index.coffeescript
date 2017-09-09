@@ -1,0 +1,134 @@
+class Bug
+  
+  constructor: ( x, y ) ->
+    @x = x
+    @y = y
+    @vx = 0
+    @vy = 0
+    @radius = 1
+    @spurt = 0.5
+    @color = '#fff'
+    @hasTarget = false
+    @
+    
+  update: ( ctx, index, ndt ) ->
+    @hasTarget = false
+    
+    if ctx.food.length
+      lowestDist = 999999
+      closestTarget = null
+      i = ctx.food.length
+      while i--
+        food = ctx.food[ i ]  
+        dx = @x - food.x
+        dy = @y - food.y
+        dist = sqrt( dx * dx + dy * dy )
+        if dist < lowestDist
+          lowestDist = dist
+          closestTarget = i
+    
+      target = ctx.food[ closestTarget ]
+      dx = @x - target.x
+      dy = @y - target.y
+      dist = sqrt( dx * dx + dy * dy )
+      if dist < target.threshold + target.radius && target.active 
+        @hasTarget = true
+        if dist < target.radius * ( target.life / target.radius ) + 5
+          target.life -= 0.004      
+   
+    if @hasTarget
+      @vx += ( random( -0.2, 0.2 ) ) * @spurt
+      @vy += ( random( -0.2, 0.2 ) ) * @spurt
+      @vx -= dx / 500
+      @vy -= dy / 500
+    else
+      @vx += ( random( -0.2, 1 ) ) * @spurt
+      @vy += ( random( -0.2, 0.2 ) ) * @spurt
+    @x += @vx * ndt
+    @y += @vy * ndt
+    @vx *= 0.95
+    @vy *= 0.95
+      
+    if @spurt > 0.5 then @spurt -= 0.1
+      
+    if @spurt <= 0.5 and !floor( random( 1000 ) )
+      @spurt = random( 1, 4 )
+      
+  wrap: ( ctx ) ->    
+    if !@hasTarget
+      if @x > ctx.width + @radius then @x = -@radius
+      else if @x < -@radius then @x = ctx.width + @radius
+      if @y > ctx.height + @radius then @y = -@radius
+      else if @y < -@radius then @y = ctx.height + @radius
+
+class Food
+  
+  constructor: ( x, y ) ->
+    @x = x
+    @y = y
+    @growthRadius = 0.0001
+    @radius = random( 20, 50 )
+    @life = @radius    
+    @threshold = 50
+    @active = false
+    @
+    
+  update: ( ctx, index, ndt ) ->
+    if !@active
+      @growthRadius += 1
+      if @growthRadius >= @radius
+        @active = true
+    if @life <= 0
+      ctx.food.splice( index, 1 )  
+            
+Sketch.create  
+  setup: ->
+    @tick = 0
+    @mouse.x = @width / 2
+    @mouse.y = @height / 2
+    @food = ( new Food( random( @width ), random( @height ) ) for i in [ 0..0 ] )
+    @bugs = ( new Bug( 0, random( @height ) ) for i in [ 0..2000 ] )
+  
+  mousedown: ->
+    @food.push( new Food( @mouse.x, @mouse.y ) )
+    
+  update: ->
+    @ndt = max 0.001, @dt / ( 1000 / 60 )
+    @tick++
+      
+    if @tick % 50 == 0
+      @food.push( new Food( random( @width ), random( @height ) ) )
+      
+    i = @food.length
+    while i--
+      @food[ i ].update( @, i, @ndt )
+        
+    i = @bugs.length
+    while i--
+      @bugs[ i ].wrap( @ )
+      @bugs[ i ].update( @, i, @ndt )
+    
+  draw: ->
+    @fillStyle = '#d33'
+    i = @food.length
+    while i--
+      @beginPath()
+      food = @food[ i ]
+      if food.active
+        @arc( food.x, food.y, max( 0.0001, ( food.radius * ( food.life / food.radius) ) ), 0, TWO_PI )
+      else
+        @arc( food.x, food.y, food.growthRadius, 0, TWO_PI )
+      @fill()    
+        
+    @beginPath()
+    @fillStyle = '#fff'
+    i = @bugs.length
+    while i--
+      bug = @bugs[ i ]
+      @rect( ~~bug.x, ~~bug.y, 1, 1 )
+    @fill()
+      
+    @beginPath()
+    @arc( @mouse.x, @mouse.y, 10 - cos( @millis / 100 ) * 2, 0, TWO_PI )
+    @strokeStyle = '#d33'
+    @stroke()
